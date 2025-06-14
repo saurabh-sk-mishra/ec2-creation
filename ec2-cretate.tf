@@ -1,36 +1,33 @@
-provider "aws" {
-  region = "us-east-1" # change if needed
-}
+name: Launch EC2 Instance
 
-resource "aws_instance" "example" {
-  ami           = "ami-0c55b159cbfafe1f0"   # Amazon Linux 2 in us-east-1 (change per region)
-  instance_type = "t2.micro"
+on:
+  workflow_dispatch:  # allows manual triggering
 
-  key_name = "your-key-pair-name"          # Replace with your actual key pair
-  tags = {
-    Name = "MyFirstEC2"
-  }
+permissions:
+  id-token: write       # required for OIDC
+  contents: read        # needed for repo access
 
-  # Optional: Add a security group inline
-  vpc_security_group_ids = [aws_security_group.allow_ssh.id]
-}
+jobs:
+  launch-ec2:
+    runs-on: ubuntu-latest
 
-resource "aws_security_group" "allow_ssh" {
-  name        = "allow_ssh"
-  description = "Allow SSH inbound traffic"
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v3
 
-  ingress {
-    description = "SSH"
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"] # Be cautious with this in production
-  }
+    - name: Configure AWS credentials via OIDC
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        role-to-assume: arn:aws:iam::721689331129:role/github-action
+        role-session-name: github-action
+        aws-region: us-east-1
 
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-}
+    - name: Launch EC2 instance
+      run: |
+        echo "Launching EC2..."
+        aws ec2 run-instances \
+          --image-id ami-0c94855ba95c71c99 \
+          --count 1 \
+          --instance-type t2.micro \
+          --key-name Jenkins \
+          --security-groups default
